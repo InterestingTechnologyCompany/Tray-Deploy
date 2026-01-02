@@ -1,4 +1,4 @@
-# TrayOS
+# Tray Operating System
 
 ## license
 
