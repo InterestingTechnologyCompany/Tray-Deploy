@@ -28,6 +28,5 @@ jobs:
         with:
           context: .
           push: true
-          # ▼▼▼ 여기를 꼭 본인 아이디로 바꾸세요!!! ▼▼▼
-          tags: donghunc/rpi-update-test:latest
+          tags: donghunc/tray:latest
           platforms: linux/arm64
