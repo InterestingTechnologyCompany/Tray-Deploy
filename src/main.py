@@ -15,7 +15,7 @@ TARGET_SOIL_HUMIDITY  = 0x12
 TARGET_PUMP           = 0x20
 TARGET_LAMP           = 0x21
 
-HEADER = 0xFF
+HEADER = 0xFF   
 UNIT_ID = 0x01
 
 
