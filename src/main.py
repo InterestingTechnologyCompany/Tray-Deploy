@@ -1,84 +1,123 @@
-# TODO: Rewrite this in C++ if rpi is too slow
-
+#pip install pyserial
+# we well eventually have to rewrite this whole shit in c++ for performance reason
 import serial
-import struct
 import time
-import sys
+import struct
+import random
 
-#TODO: CHANGE THIS TO ACTUAL SERIAL PORT
-SERIAL_PORT = '/dev/'
-BAUD_RATE = 9600
+CMD_READ    = 0x01
+CMD_WRITE   = 0x02
+CMD_REPORT  = 0x03
 
-CMD_READ   = 0x01
-CMD_WRITE  = 0x02
-CMD_REPORT = 0x03
+TARGET_AIR_TEMP       = 0x10
+TARGET_AIR_HUMIDITY   = 0x11
+TARGET_SOIL_HUMIDITY  = 0x12
+TARGET_PUMP           = 0x20
+TARGET_LAMP           = 0x21
 
-TARGETS = {
-    'AIR_TEMP': 0x10,
-    'AIR_HUMIDITY': 0x11,
-    'SOIL_HUMIDITY': 0x12,
-    'PUMP': 0x20,
-    'LAMP': 0x21
-}
+HEADER = 0xFF
+UNIT_ID = 0x01
 
-TARGET_NAMES = {v: k for k, v in TARGETS.items()}
 
-try:
-    ser = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=1)
-    print(f" Connected : {SERIAL_PORT}")
-    time.sleep(2) # Arduino reset delay
-except Exception as e:
-    print(e)
-    sys.exit()
-    
-    
-def calculate_checksum(uid, cmd, target, value):
+PORT = '/dev/ttyUSB0'  # TODO: 니 포트로 변경
+
+# LE
+# B: unsigned char (1byte), H: unsigned short (2bytes)
+# header(B), unitID(B), cmd(B), target(B), value(H), checksum(B)
+PACKET_FMT = '<BBBBHB' 
+PACKET_SIZE = struct.calcsize(PACKET_FMT)
+
+def calculate_checksum(header, unit_id, cmd, target, value):
     val_low = value & 0xFF
     val_high = (value >> 8) & 0xFF
-    return (uid + cmd + target + val_low + val_high) & 0xFF
+    total = header + unit_id + cmd + target + val_low + val_high
+    return total & 0xFF
 
-def send_packet(unit_id, cmd, target, value):
-    header = 0xFF
-    checksum = calculate_checksum(unit_id, cmd, target, value)
+def send_packet(ser, cmd, target, value=0):
+    checksum = calculate_checksum(HEADER, UNIT_ID, cmd, target, value)
     
-    packet = struct.pack('<BBBBHB', header, unit_id, cmd, target, value, checksum)
+    packet_data = struct.pack(PACKET_FMT, HEADER, UNIT_ID, cmd, target, value, checksum)
     
-    ser.write(packet)
-    print(f"\n   [SENT] ID:{unit_id} Cmd:{cmd} Tgt:{target} Val:{value}")
-    print(f"   Raw: {packet.hex().upper()}")
-    
+    ser.write(packet_data)
 
+def read_packet(ser):
+    if ser.in_waiting >= PACKET_SIZE:
+        raw_data = ser.read(PACKET_SIZE)
+        
+        try:
+            header, unit_id, cmd, target, value, recv_checksum = struct.unpack(PACKET_FMT, raw_data)
+        except struct.error:
+            print("Error: Packet structure mismatch")
+            return None
 
-def read_response():
-    print("Waiting for response...", end='', flush=True)
-    start_time = time.time()
-    
-    while time.time() - start_time < 2.0:
-        if ser.in_waiting >= 7:
-            data = ser.read(7)
+        calc_checksum = calculate_checksum(header, unit_id, cmd, target, value)
+        
+        if recv_checksum != calc_checksum:
+            print(f"E Checksum mismatch! Recv: {recv_checksum:#02x}, Calc: {calc_checksum:#02x}")
+            return None
             
-            header, uid, cmd, target, value, chk = struct.unpack('<BBBBHB', data)
-            
-            if header != 0xFF:
-                # wrong header
-                # print ("wrong header")
-                return
-            
-            calc_chk = calculate_checksum(uid, cmd, target, value)
-            if chk != calc_chk:
-                # checksum error
-                # print("checksum error")
-                return
+        return {
+            "header": header,
+            "unitID": unit_id,
+            "cmd": cmd,
+            "target": target,
+            "value": value
+        }
+    return None
 
-            print(f"\n [RECV] ID:{uid} Cmd:{cmd} Target:{TARGET_NAMES.get(target, 'Unknown')}")
+def main():
+    BAUDRATE = 9600
+
+    try:
+        ser = serial.Serial(PORT, BAUDRATE, timeout=1)
+        print(f"Connected to {PORT}")
+        
+        time.sleep(5) 
+        ser.reset_input_buffer() 
+        print("Ready via Serial")
+
+        while True:
             
-            if target in [TARGETS['AIR_TEMP'], TARGETS['AIR_HUMID']]:
-                print(f"   👉 Value: {value / 10.0}")
-            else:
-                print(f"   👉 Value: {value}")
-            return
+            time.sleep(0.5)
+            send_packet(ser, CMD_READ, TARGET_AIR_HUMIDITY)
+            time.sleep(0.1) # 아두이노 처리 대기
             
-        time.sleep(0.1)
-    print("No response (Timeout)")
-    
-    
+            resp = read_packet(ser)
+            if resp and resp['cmd'] == CMD_REPORT:
+                humid_val = resp['value'] / 100.0
+                print(f"[Rx] Air Humidity: {humid_val:.2f}% (Raw: {resp['value']})")
+            
+            time.sleep(0.5)
+            send_packet(ser, CMD_READ, TARGET_AIR_TEMP)
+            time.sleep(0.1) # 아두이노 처리 대기
+            
+            resp = read_packet(ser)
+            if resp and resp['cmd'] == CMD_REPORT:
+                temp_val = resp['value'] / 100.0
+                print(f"[Rx] Air Temp: {temp_val:.2f}°C (Raw: {resp['value']})")
+
+            time.sleep(0.5)
+            send_packet(ser, CMD_READ, TARGET_SOIL_HUMIDITY)
+            time.sleep(0.1)
+            
+            resp = read_packet(ser)
+            if resp and resp['cmd'] == CMD_REPORT:
+                humi_val = resp['value'] / 100.0
+                print(f"[Rx] Soil Humi: {humi_val:.2f}% (Raw: {resp['value']})")
+                
+            
+            send_packet(ser, CMD_WRITE, TARGET_LAMP, 128)
+
+            print("-" * 30)
+            time.sleep(2) # 2초 간격 반복
+
+    except serial.SerialException as e:
+        print(f"Serial E: {e}")
+    except KeyboardInterrupt:
+        print("\nExiting program")
+    finally:
+        if 'ser' in locals() and ser.is_open:
+            ser.close()
+
+if __name__ == "__main__":
+    main()
