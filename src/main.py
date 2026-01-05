@@ -1,5 +1,8 @@
 #pip install pyserial
 # we well eventually have to rewrite this whole shit in c++ for performance reason
+# we will HAVE TO implement GStreamer eventually
+
+import cv2
 import serial
 import time
 import struct
