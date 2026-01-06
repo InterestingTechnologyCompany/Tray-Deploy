@@ -5,7 +5,6 @@
 import serial
 import time
 import struct
-import flask
 
 CMD_READ                = 0x01
 CMD_WRITE               = 0x02
