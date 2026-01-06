@@ -5,28 +5,61 @@ on:
     branches: ["main"]
 
 jobs:
-  build-and-push:
+  check-and-build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
+      # 1. 커밋 메시지를 분석하여 빌드 설정 결정
+      - name: Determining Build Target
+        id: target
+        run: |
+          MESSAGE="${{ github.event.head_commit.message }}"
+          echo "Commit message: $MESSAGE"
+          
+          if [[ "$MESSAGE" == *"[main]"* ]]; then
+            echo "TARGET_FOLDER=src" >> $GITHUB_OUTPUT
+            echo "DOCKER_TAG=latest" >> $GITHUB_OUTPUT
+            echo "SHOULD_BUILD=true" >> $GITHUB_OUTPUT
+            
+          elif [[ "$MESSAGE" == *"[dev]"* ]]; then
+            echo "TARGET_FOLDER=dev" >> $GITHUB_OUTPUT
+            echo "DOCKER_TAG=dev" >> $GITHUB_OUTPUT
+            echo "SHOULD_BUILD=true" >> $GITHUB_OUTPUT
+            
+          elif [[ "$MESSAGE" == *"[test]"* ]]; then
+            echo "TARGET_FOLDER=test" >> $GITHUB_OUTPUT
+            echo "DOCKER_TAG=test" >> $GITHUB_OUTPUT
+            echo "SHOULD_BUILD=true" >> $GITHUB_OUTPUT
+            
+          else
+            echo "SHOULD_BUILD=false" >> $GITHUB_OUTPUT
+            echo "Skipping build as no valid target found in commit message."
+          fi
+
       - name: Set up QEMU
+        if: steps.target.outputs.SHOULD_BUILD == 'true'
         uses: docker/setup-qemu-action@v2
 
       - name: Set up Docker Buildx
+        if: steps.target.outputs.SHOULD_BUILD == 'true'
         uses: docker/setup-buildx-action@v2
 
       - name: Login to Docker Hub
+        if: steps.target.outputs.SHOULD_BUILD == 'true'
         uses: docker/login-action@v2
         with:
-          username: ${{ secrets.DOCKER_USERNAME }} ## 우선 내꺼로 되어있는데 상관 없을듯
+          username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Build and push
+        if: steps.target.outputs.SHOULD_BUILD == 'true'
         uses: docker/build-push-action@v4
         with:
           context: .
           push: true
-          tags: donghunc/tray:latest
+          tags: donghunc/tray:${{ steps.target.outputs.DOCKER_TAG }}
           platforms: linux/arm64
+          build-args: |
+            TARGET_FOLDER=${{ steps.target.outputs.TARGET_FOLDER }}

@@ -2,23 +2,24 @@
 # we well eventually have to rewrite this whole shit in c++ for performance reason
 # we will HAVE TO implement GStreamer eventually
 
+import cv2
 import serial
 import time
 import struct
-import flask
+import random
 
-CMD_READ                = 0x01
-CMD_WRITE               = 0x02
-CMD_REPORT              = 0x03
+CMD_READ    = 0x01
+CMD_WRITE   = 0x02
+CMD_REPORT  = 0x03
 
-TARGET_AIR_TEMP         = 0x10
-TARGET_AIR_HUMIDITY     = 0x11
-TARGET_SOIL_HUMIDITY    = 0x12
-TARGET_PUMP             = 0x20
-TARGET_LAMP             = 0x21
+TARGET_AIR_TEMP       = 0x10
+TARGET_AIR_HUMIDITY   = 0x11
+TARGET_SOIL_HUMIDITY  = 0x12
+TARGET_PUMP           = 0x20
+TARGET_LAMP           = 0x21
 
-HEADER                  = 0xFF   
-UNIT_ID                 = 0x01
+HEADER = 0xFF   
+UNIT_ID = 0x01
 
 
 PORT = '####'  # TODO: 니 포트로 변경
@@ -68,6 +69,8 @@ def read_packet(ser):
     return None
 
 def main():
+    
+
     try:
         ser = serial.Serial(PORT, BAUDRATE, timeout=1)
         print(f"Connected to {PORT}")
@@ -77,25 +80,39 @@ def main():
         print("Ready via Serial")
 
         while True:
+            
+            time.sleep(0.5)
+            send_packet(ser, CMD_READ, TARGET_AIR_HUMIDITY)
+            time.sleep(0.1) # 아두이노 처리 대기
+            
             resp = read_packet(ser)
-            #TODO : Don't we have something like switch/case for python ?? 
             if resp and resp['cmd'] == CMD_REPORT:
                 humid_val = resp['value'] / 100.0
                 print(f"[Rx] Air Humidity: {humid_val:.2f}% (Raw: {resp['value']})")
             
+            time.sleep(0.5)
+            send_packet(ser, CMD_READ, TARGET_AIR_TEMP)
+            time.sleep(0.1) # 아두이노 처리 대기
+            
+            resp = read_packet(ser)
             if resp and resp['cmd'] == CMD_REPORT:
                 temp_val = resp['value'] / 100.0
                 print(f"[Rx] Air Temp: {temp_val:.2f}°C (Raw: {resp['value']})")
 
+            time.sleep(0.5)
+            send_packet(ser, CMD_READ, TARGET_SOIL_HUMIDITY)
+            time.sleep(0.1)
+            
+            resp = read_packet(ser)
             if resp and resp['cmd'] == CMD_REPORT:
                 humi_val = resp['value'] / 100.0
                 print(f"[Rx] Soil Humi: {humi_val:.2f}% (Raw: {resp['value']})")
+                
             
-            print("-" * 30)    
-            time.sleep(2) # 2초 간격 반복
-            
-            # send_packet(ser, CMD_WRITE, TARGET_LAMP, 128)
+            send_packet(ser, CMD_WRITE, TARGET_LAMP, 128)
 
+            print("-" * 30)
+            time.sleep(2) # 2초 간격 반복
 
     except serial.SerialException as e:
         print(f"Serial E: {e}")
