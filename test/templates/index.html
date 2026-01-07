@@ -1,0 +1,58 @@
+
+{% extends "base.html" %}
+{% block title %}Smart Farm{% endblock %}
+{% block head %}
+<script>
+    function updateSensors() {
+        fetch('/data')
+            .then(r => r.json())
+            .then(d => {
+                document.getElementById('t_air').innerText = d.air_temp.toFixed(2);
+                document.getElementById('h_air').innerText = d.air_humidity.toFixed(2);
+                document.getElementById('h_soil').innerText = d.soil_humidity.toFixed(2);
+            });
+    }
+    function sendControl(target, val) {
+        fetch('/control', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({target: target, value: val})
+        });
+    }
+    setInterval(updateSensors, 1000);
+</script>
+{% endblock %}
+{% block content %}
+<div class="container mx-auto py-8 px-4">
+    <h1 class="text-3xl font-bold text-gray-800 mb-8 text-center">🌿 Smart Farm Monitor</h1>
+    <div class="flex flex-wrap justify-center gap-6 mb-8">
+        <div class="bg-white rounded-xl shadow-md p-6 w-56 flex flex-col items-center">
+            <h3 class="text-gray-500 mb-2">Air Temperature</h3>
+            <div class="text-4xl font-bold text-gray-800"><span id="t_air">--</span><span class="text-base text-gray-400 ml-1">°C</span></div>
+        </div>
+        <div class="bg-white rounded-xl shadow-md p-6 w-56 flex flex-col items-center">
+            <h3 class="text-gray-500 mb-2">Air Humidity</h3>
+            <div class="text-4xl font-bold text-gray-800"><span id="h_air">--</span><span class="text-base text-gray-400 ml-1">%</span></div>
+        </div>
+        <div class="bg-white rounded-xl shadow-md p-6 w-56 flex flex-col items-center">
+            <h3 class="text-gray-500 mb-2">Soil Humidity</h3>
+            <div class="text-4xl font-bold text-gray-800"><span id="h_soil">--</span><span class="text-base text-gray-400 ml-1">%</span></div>
+        </div>
+    </div>
+    <div class="bg-white rounded-xl shadow-md p-6 inline-block mx-auto">
+        <h3 class="text-gray-600 mb-4 text-center">Device Control</h3>
+        <div class="flex flex-col gap-4">
+            <div class="flex items-center gap-2">
+                <span class="mr-2">💡 LAMP:</span>
+                <button class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded transition" onclick="sendControl(0x21, 128)">ON</button>
+                <button class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded transition" onclick="sendControl(0x21, 0)">OFF</button>
+            </div>
+            <div class="flex items-center gap-2">
+                <span class="mr-2">💧 PUMP:</span>
+                <button class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded transition" onclick="sendControl(0x20, 128)">ON</button>
+                <button class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded transition" onclick="sendControl(0x20, 0)">OFF</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -93,7 +93,8 @@ def main():
             print("-" * 30)    
             time.sleep(2) # 2초 간격 반복
             
-            # send_packet(ser, CMD_WRITE, TARGET_LAMP, 128)
+            send_packet(ser, CMD_WRITE, TARGET_LAMP, 128)
+            send_packet(ser, CMD_WRITE, TARGET_PUMP, 128)
 
 
     except serial.SerialException as e:
