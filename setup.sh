@@ -28,7 +28,8 @@ sudo docker run -d \
   --name my-app \
   --restart always \
   --privileged \
-  donghunc/tray:latest
+  -e ARDUINO_PORT=/dev/ttyACM1 \
+  donghunc/tray:test
 
 sudo docker run -d \
   --name watchtower \
