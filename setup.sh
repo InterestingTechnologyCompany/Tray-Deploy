@@ -6,6 +6,8 @@ set -e
 sudo apt-get update && sudo apt-get install -y --no-install-recommends \
     gcc
 
+
+# ** 데비안 계열이라 https://docs.docker.com/engine/install/debian/#install-using-the-repository  이 필ㅛ
 # install docker
 sudo apt-get install -y ca-certificates curl 
 sudo install -m 0755 -d /etc/apt/keyrings

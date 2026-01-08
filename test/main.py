@@ -5,7 +5,7 @@ import struct
 import threading
 from flask import Flask, render_template, jsonify, request
 
-PORT = 'COM3'  # TODO: 포트 니꺼로 변경하기
+PORT = '/dev/ttyACM0'  # TODO: 포트 니꺼로 변경하기
 BAUDRATE = 9600
 
 CMD_READ                = 0x01
